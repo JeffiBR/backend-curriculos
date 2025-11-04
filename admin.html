@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo - Candidaturas</title>
+    <link rel="stylesheet" href="admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Painel de Candidaturas</h1>
+            <div class="header-actions">
+                <a href="index.html" class="btn-secondary">Voltar ao Formulário</a>
+                <button id="theme-btn" class="theme-btn">🌙 Modo Escuro</button>
+            </div>
+        </header>
+
+        <div class="admin-content">
+            <!-- Menu de Navegação -->
+            <nav class="admin-nav">
+                <button class="nav-btn active" data-target="dashboard">Dashboard</button>
+                <button class="nav-btn" data-target="candidaturas">Candidaturas</button>
+                <button class="nav-btn" data-target="vagas">Gerenciar Vagas</button>
+                <button class="nav-btn" data-target="busca">Busca Avançada</button>
+            </nav>
+
+            <!-- Dashboard -->
+            <section id="dashboard" class="content-section active">
+                <h2>Dashboard Analítico</h2>
+                
+                <div class="dashboard-stats">
+                    <div class="stat-card">
+                        <h3>Total de Candidaturas</h3>
+                        <span id="total-candidaturas">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Candidaturas Hoje</h3>
+                        <span id="candidaturas-hoje">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Vaga Mais Popular</h3>
+                        <span id="vaga-popular">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Cidade Top</h3>
+                        <span id="cidade-top">-</span>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h3>Candidaturas por Dia (Últimos 7 dias)</h3>
+                        <canvas id="candidaturasChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Top Vagas</h3>
+                        <canvas id="vagasChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Top Cidades</h3>
+                        <canvas id="cidadesChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Dia com Mais Candidaturas</h3>
+                        <div id="top-day-info" class="top-day-info">
+                            <div class="top-day-card">
+                                <div class="top-day-date" id="top-day-date">-</div>
+                                <div class="top-day-count" id="top-day-count">0 candidaturas</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Candidaturas -->
+            <section id="candidaturas" class="content-section">
+                <div class="section-header">
+                    <h2>Candidaturas Recebidas</h2>
+                    <div class="loading" id="loading-indicator">Carregando...</div>
+                </div>
+
+                <!-- Filtros e Busca -->
+                <section class="filters-section">
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="Buscar por nome, CPF, vaga...">
+                        <button id="search-btn" class="btn-primary">🔍 Buscar</button>
+                    </div>
+                    
+                    <div class="filter-controls">
+                        <div class="filter-group">
+                            <label for="filter-vaga">Filtrar por Vaga:</label>
+                            <select id="filter-vaga">
+                                <option value="">Todas as Vagas</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="filter-data">Filtrar por Data:</label>
+                            <input type="date" id="filter-data">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="filter-estado">Filtrar por Estado:</label>
+                            <input type="text" id="filter-estado" placeholder="UF">
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="filter-experiencia">Experiência (anos):</label>
+                            <select id="filter-experiencia">
+                                <option value="">Qualquer</option>
+                                <option value="1-2">1-2 anos</option>
+                                <option value="3-5">3-5 anos</option>
+                                <option value="5+">5+ anos</option>
+                            </select>
+                        </div>
+                        
+                        <button id="clear-filters" class="btn-secondary">Limpar Filtros</button>
+                    </div>
+                </section>
+
+                <!-- Lista de Candidaturas -->
+                <div class="candidaturas-list" id="candidaturas-list">
+                    <!-- Lista será preenchida via JavaScript -->
+                </div>
+                
+                <div class="pagination" id="pagination">
+                    <!-- Paginação será gerada via JavaScript -->
+                </div>
+            </section>
+
+            <!-- Gerenciamento de Vagas -->
+            <section id="vagas" class="content-section">
+                <div class="section-header">
+                    <h2>Gerenciar Vagas</h2>
+                    <button id="add-vaga-btn" class="btn-primary">+ Nova Vaga</button>
+                </div>
+
+                <div class="vagas-list" id="vagas-list">
+                    <!-- Lista de vagas será preenchida via JavaScript -->
+                </div>
+            </section>
+
+            <!-- Busca Avançada -->
+            <section id="busca" class="content-section">
+                <h2>Busca Avançada em Currículos</h2>
+                
+                <div class="search-advanced">
+                    <div class="search-fields">
+                        <input type="text" id="keyword-input" placeholder="Palavras-chave (ex: Python, React, Gestão)">
+                        <input type="text" id="skill-input" placeholder="Habilidades específicas">
+                        <select id="experience-filter">
+                            <option value="">Qualquer experiência</option>
+                            <option value="1">1+ anos</option>
+                            <option value="3">3+ anos</option>
+                            <option value="5">5+ anos</option>
+                        </select>
+                        <button id="search-keyword-btn" class="btn-primary">🔍 Buscar</button>
+                    </div>
+                </div>
+
+                <div class="search-results" id="keyword-results">
+                    <!-- Resultados da busca -->
+                </div>
+            </section>
+        </div>
+
+        <!-- Modal de Detalhes da Candidatura -->
+        <div id="details-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Detalhes da Candidatura</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body" id="modal-body">
+                    <!-- Conteúdo será preenchido via JavaScript -->
+                </div>
+                <div class="modal-footer">
+                    <button id="view-curriculo-btn" class="btn-primary">Ver Currículo</button>
+                    <button id="download-curriculo-btn" class="btn-secondary">Baixar Currículo</button>
+                    <button id="delete-candidatura-btn" class="btn-danger">Excluir Candidatura</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Visualização de Currículo -->
+        <div id="curriculo-modal" class="modal hidden">
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h2>Visualização do Currículo</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div id="pdf-viewer" class="pdf-viewer">
+                        <div class="pdf-controls">
+                            <button id="prev-page" class="btn-secondary">‹ Anterior</button>
+                            <span id="page-info">Página <span id="current-page">1</span> de <span id="total-pages">0</span></span>
+                            <button id="next-page" class="btn-secondary">Próxima ›</button>
+                            <button id="download-pdf" class="btn-primary">Baixar</button>
+                        </div>
+                        <canvas id="pdf-canvas"></canvas>
+                    </div>
+                    <div id="doc-viewer" class="doc-viewer hidden">
+                        <p>Para visualizar documentos Word, faça o download do arquivo.</p>
+                        <button id="download-doc" class="btn-primary">Baixar Documento</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Confirmação -->
+        <div id="confirm-modal" class="modal hidden">
+            <div class="modal-content small">
+                <div class="modal-header">
+                    <h2>Confirmar Exclusão</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <p>Tem certeza que deseja excluir esta candidatura? Esta ação não pode ser desfeita.</p>
+                </div>
+                <div class="modal-footer">
+                    <button id="confirm-delete" class="btn-danger">Sim, Excluir</button>
+                    <button id="cancel-delete" class="btn-secondary">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Gerenciamento de Vaga -->
+        <div id="vaga-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="vaga-modal-title">Nova Vaga</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <form id="vaga-form">
+                        <input type="hidden" id="vaga-id">
+                        <div class="form-group">
+                            <label for="vaga-titulo">Título da Vaga *</label>
+                            <input type="text" id="vaga-titulo" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-slug">Slug (identificador único) *</label>
+                            <input type="text" id="vaga-slug" required>
+                            <small>Ex: desenvolvedor-frontend-senior</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-descricao">Descrição</label>
+                            <textarea id="vaga-descricao" rows="4"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-ativa">
+                                <input type="checkbox" id="vaga-ativa" checked> Vaga ativa
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button id="save-vaga-btn" class="btn-primary">Salvar Vaga</button>
+                    <button id="cancel-vaga-btn" class="btn-secondary">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>
