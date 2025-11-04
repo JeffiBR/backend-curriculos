@@ -35,7 +35,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Configuração do Supabase
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // Use a service key para ter mais permissões
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Configuração do Multer para upload de arquivos
@@ -90,7 +90,7 @@ app.post('/api/curriculos', upload.single('curriculo'), async (req, res) => {
       });
     }
 
-    const { nome, telefone, cpf, cep, estado, cidade, bairro, rua, vaga } = req.body;
+    const { nome, telefone, cpf, cep, estado, cidade, bairro, rua, vaga, numero } = req.body;
     
     // Limpar CPF (remover caracteres não numéricos)
     const cpfLimpo = cpf.replace(/\D/g, '');
@@ -146,10 +146,11 @@ app.post('/api/curriculos', upload.single('curriculo'), async (req, res) => {
           cidade: cidade.trim(),
           bairro: bairro.trim(),
           rua: rua.trim(),
+          numero: numero ? numero.trim() : null, // Campo opcional
           vaga: vaga,
           arquivo_curriculo: fileName,
           data_envio: new Date().toISOString(),
-          ip_address: req.ip // Para controle de segurança
+          ip_address: req.ip
         }
       ])
       .select();
@@ -165,7 +166,7 @@ app.post('/api/curriculos', upload.single('curriculo'), async (req, res) => {
       throw new Error('Falha ao salvar os dados do currículo');
     }
 
-    console.log('Currículo salvo com sucesso!');
+    console.log('Currículo salvo com sucesso! ID:', dbData[0].id);
     
     // Resposta de sucesso
     res.status(201).json({
@@ -198,40 +199,44 @@ app.post('/api/curriculos', upload.single('curriculo'), async (req, res) => {
   }
 });
 
-// Endpoint para listar vagas disponíveis (opcional)
+// Endpoint para listar vagas disponíveis
 app.get('/api/vagas', async (req, res) => {
   try {
-    // Em um sistema real, isso viria de uma tabela no banco
     const vagas = [
       {
         id: 'desenvolvedor-frontend',
         titulo: 'Desenvolvedor Front-end',
         descricao: 'React, TypeScript, CSS avançado. Experiência com componentes reutilizáveis.',
-        tipo: 'Remoto'
+        tipo: 'Remoto',
+        salario: 'R$ 6.000 - R$ 10.000'
       },
       {
         id: 'desenvolvedor-backend',
         titulo: 'Desenvolvedor Back-end',
         descricao: 'Node.js, Python, bancos de dados. Conhecimento em arquitetura de microserviços.',
-        tipo: 'Híbrido'
+        tipo: 'Híbrido',
+        salario: 'R$ 7.000 - R$ 12.000'
       },
       {
         id: 'analista-dados',
         titulo: 'Analista de Dados',
         descricao: 'Python, SQL, Power BI. Conhecimento em machine learning é um diferencial.',
-        tipo: 'Presencial'
+        tipo: 'Presencial',
+        salario: 'R$ 5.000 - R$ 9.000'
       },
       {
         id: 'designer-ux',
         titulo: 'Designer UX/UI',
         descricao: 'Figma, Adobe XD, pesquisa de usuário. Portfólio obrigatório.',
-        tipo: 'Remoto'
+        tipo: 'Remoto',
+        salario: 'R$ 4.500 - R$ 8.000'
       },
       {
         id: 'gerente-projetos',
         titulo: 'Gerente de Projetos',
         descricao: 'Metodologias ágeis, gestão de equipes, planejamento estratégico.',
-        tipo: 'Híbrido'
+        tipo: 'Híbrido',
+        salario: 'R$ 8.000 - R$ 15.000'
       }
     ];
 
@@ -249,7 +254,7 @@ app.get('/api/vagas', async (req, res) => {
   }
 });
 
-// Endpoint para estatísticas (opcional)
+// Endpoint para estatísticas
 app.get('/api/estatisticas', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -258,19 +263,20 @@ app.get('/api/estatisticas', async (req, res) => {
 
     if (error) throw error;
 
-    const totalCurriculos = data.length;
-    const curriculosPorVaga = data.reduce((acc, curr) => {
+    const totalCurriculos = data ? data.length : 0;
+    
+    const curriculosPorVaga = data ? data.reduce((acc, curr) => {
       acc[curr.vaga] = (acc[curr.vaga] || 0) + 1;
       return acc;
-    }, {});
+    }, {}) : {};
 
     // Currículos dos últimos 7 dias
     const seteDiasAtras = new Date();
     seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
     
-    const curriculosRecentes = data.filter(item => 
+    const curriculosRecentes = data ? data.filter(item => 
       new Date(item.data_envio) > seteDiasAtras
-    ).length;
+    ).length : 0;
 
     res.json({
       success: true,
@@ -286,6 +292,68 @@ app.get('/api/estatisticas', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Erro interno do servidor'
+    });
+  }
+});
+
+// Endpoint para verificar status de um currículo
+app.get('/api/curriculos/:cpf/:vaga', async (req, res) => {
+  try {
+    const { cpf, vaga } = req.params;
+    const cpfLimpo = cpf.replace(/\D/g, '');
+
+    const { data, error } = await supabase
+      .from('curriculos')
+      .select('id, data_envio')
+      .eq('cpf', cpfLimpo)
+      .eq('vaga', vaga)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = não encontrado
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        existe: !!data,
+        data_envio: data ? data.data_envio : null
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao verificar currículo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro interno do servidor'
+    });
+  }
+});
+
+// Endpoint para testar conexão com Supabase
+app.get('/api/test-db', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('curriculos')
+      .select('count')
+      .limit(1);
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message: 'Conexão com o banco de dados estabelecida com sucesso',
+      data: {
+        conexao: 'ativa',
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro na conexão com o banco:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Falha na conexão com o banco de dados'
     });
   }
 });
@@ -311,6 +379,7 @@ app.use((error, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`📍 Health check disponível em: http://localhost:${PORT}/health`);
+  console.log(`📍 Teste de DB disponível em: http://localhost:${PORT}/api/test-db`);
 });
 
 // Graceful shutdown
